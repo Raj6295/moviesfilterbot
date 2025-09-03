@@ -1,22 +1,33 @@
 import logging
+import sys
+import os
 from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
 from typing import Dict, List, Optional, Union
 from bson import ObjectId
 
-from ..config import Config
+# Add the project root to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import Config
 
 class Database:
     """Database class to handle all database operations"""
     
     def __init__(self, uri: str, database_name: str = "movie_filter_bot"):
         """Initialize the database connection"""
-        self._client = AsyncIOMotorClient(uri)
-        self.db = self._client[database_name]
-        self.users = self.db.users
-        self.files = self.db.files
-        self.chats = self.db.chats
-        self.logger = logging.getLogger(__name__)
+        try:
+            self._client = AsyncIOMotorClient(uri, serverSelectionTimeoutMS=5000)
+            self.db = self._client.get_database(database_name)
+            self.users = self.db.users
+            self.files = self.db.files
+            self.chats = self.db.chats
+            self.logger = logging.getLogger(__name__)
+            # Test the connection
+            self._client.admin.command('ping')
+        except Exception as e:
+            self.logger.error(f"❌ Failed to connect to MongoDB: {e}")
+            raise
         
     async def init_db(self):
         """Initialize database indexes"""
