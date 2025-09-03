@@ -34,17 +34,11 @@ bot = Client(
     api_hash=os.environ.get("API_HASH"),
     bot_token=os.environ.get("BOT_TOKEN"),
     workers=200,
-    plugins={
-        "root": "handlers",
-        "include": [
-            "handlers.commands",
-            "handlers.callbacks"
-        ]
-    }
+    plugins={"root": "handlers"}
 )
 
-# Import handlers explicitly to ensure they're loaded
-import handlers
+# Import handlers explicitly to ensure they're registered
+from handlers import commands, callbacks
 
 async def handle_health_check(request):
     """Handle health check requests"""
