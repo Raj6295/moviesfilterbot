@@ -126,9 +126,13 @@ class MovieBot(Client):
 bot = MovieBot()
 
 # Register error handler
-@bot.on_message(filters.all & ~filters.edited, group=-1)
+@bot.on_message(filters.all, group=-1)
 async def error_handler(client, message):
     """Global error handler for messages"""
+    # Skip edited messages to avoid duplicate processing
+    if message.edit_date is not None:
+        return
+        
     try:
         # Let other handlers process the message
         await message.continue_propagation()
