@@ -80,20 +80,26 @@ class MovieBot(Client):
         except (BadRequest, UserNotParticipant):
             return False
     
-    async def send_log_message(self, text: str, reply_markup: InlineKeyboardMarkup = None):
-        """Send a log message to the log channel"""
+    async def send_log_message(self, text: str, reply_markup: InlineKeyboardMarkup = None, max_retries: int = 3):
+        """Send a log message to the log channel with retry logic"""
         if not Config.LOG_CHANNEL_ID:
-            return
+            return False
             
-        try:
-            await self.send_message(
-                chat_id=Config.LOG_CHANNEL_ID,
-                text=text,
-                reply_markup=reply_markup,
-                disable_web_page_preview=True
-            )
-        except Exception as e:
-            self.logger.error(f"❌ Error sending log message: {e}")
+        for attempt in range(max_retries):
+            try:
+                await self.send_message(
+                    chat_id=Config.LOG_CHANNEL_ID,
+                    text=text[:4096],  # Telegram message length limit
+                    reply_markup=reply_markup,
+                    disable_web_page_preview=True
+                )
+                return True
+            except Exception as e:
+                if attempt == max_retries - 1:  # Last attempt
+                    self.logger.error(f"❌ Failed to send log message after {max_retries} attempts: {e}")
+                    return False
+                await asyncio.sleep(1)  # Wait before retry
+        return False
     
     async def handle_error(self, update, context):
         """Handle errors in the bot"""

@@ -55,6 +55,26 @@ async def start_web_server():
     logger.info(f"Web server started on port {port}")
     return runner, site
 
+async def start_bot():
+    """Start the bot with retry logic for flood waits"""
+    retry_count = 0
+    max_retries = 3
+    
+    while retry_count < max_retries:
+        try:
+            await bot.start()
+            return await bot.get_me()
+        except Exception as e:
+            if "FLOOD_WAIT" in str(e):
+                wait_time = int(str(e).split()[-2])
+                retry_count += 1
+                logger.warning(f"⚠️ Flood wait for {wait_time} seconds. Retry {retry_count}/{max_retries}")
+                await asyncio.sleep(wait_time)
+            else:
+                raise
+    
+    raise Exception("Max retries exceeded for flood wait")
+
 async def main():
     """Main function to start the bot and web server"""
     try:
@@ -65,31 +85,33 @@ async def main():
         web_runner, web_site = await start_web_server()
         logger.info("✅ Web server started successfully")
         
-        # Start the bot
+        # Start the bot with retry logic
         logger.info("🤖 Starting bot client...")
-        await bot.start()
-        
-        # Verify bot is running
         try:
-            me = await bot.get_me()
+            me = await start_bot()
             logger.info(f"✅ Bot started as @{me.username} (ID: {me.id})")
+            
+            # Initialize database
+            from database.models import db
+            await db.init_db()
+            
+            # Set bot commands
+            logger.info("⌨️ Setting up bot commands...")
+            await bot.set_bot_commands([
+                ("start", "Start the bot"),
+                ("help", "Show help message"),
+                ("search", "Search for files"),
+                ("stats", "Show bot statistics (Admin only)")
+            ])
+            logger.info("✅ Bot commands set up successfully")
+            
+            # Keep the bot running
+            logger.info("Bot and web server are now running.")
+            await idle()
+            
         except Exception as e:
-            logger.error(f"❌ Failed to get bot info: {e}")
+            logger.error(f"❌ Error in bot initialization: {e}", exc_info=True)
             raise
-        
-        # Set bot commands
-        logger.info("⌨️ Setting up bot commands...")
-        await bot.set_bot_commands([
-            ("start", "Start the bot"),
-            ("help", "Show help message"),
-            ("stats", "Show bot statistics"),
-            ("index", "Index all files from the channel (Admin only)")
-        ])
-        logger.info("✅ Bot commands set up successfully")
-        
-        # Keep the bot running
-        logger.info("Bot and web server are now running.")
-        await idle()
             
     except ApiIdInvalid:
         logger.error("❌ Invalid API ID or API HASH. Please check your credentials.")
