@@ -1,0 +1,9 @@
+pyrogram==2.0.106
+motor==3.3.1
+python-dotenv==1.0.0
+python-telegram-bot==20.6
+aiohttp==3.8.5
+python-multipart==0.0.6
+pymongo[srv]==4.3.3
+tgcrypto==1.2.5
+python-decouple==3.8

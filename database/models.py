@@ -1,0 +1,150 @@
+import logging
+from datetime import datetime
+from motor.motor_asyncio import AsyncIOMotorClient
+from typing import Dict, List, Optional, Union
+from bson import ObjectId
+
+from ..config import Config
+
+class Database:
+    """Database class to handle all database operations"""
+    
+    def __init__(self, uri: str, database_name: str = "movie_filter_bot"):
+        """Initialize the database connection"""
+        self._client = AsyncIOMotorClient(uri)
+        self.db = self._client[database_name]
+        self.users = self.db.users
+        self.files = self.db.files
+        self.chats = self.db.chats
+        self.logger = logging.getLogger(__name__)
+        
+    async def init_db(self):
+        """Initialize database indexes"""
+        try:
+            # Create indexes for better query performance
+            await self.users.create_index("user_id", unique=True)
+            await self.files.create_index([("file_name", "text")])
+            await self.files.create_index("file_id", unique=True)
+            await self.chats.create_index("chat_id", unique=True)
+            self.logger.info("✅ Database indexes created successfully")
+        except Exception as e:
+            self.logger.error(f"❌ Error creating database indexes: {e}")
+            raise
+    
+    # User-related methods
+    async def add_user(self, user_id: int, username: str = "", first_name: str = ""):
+        """Add a new user to the database"""
+        try:
+            user = {
+                "user_id": user_id,
+                "username": username,
+                "first_name": first_name,
+                "banned": False,
+                "join_date": datetime.utcnow()
+            }
+            await self.users.update_one({"user_id": user_id}, {"$set": user}, upsert=True)
+            self.logger.info(f"✅ User {user_id} added/updated in database")
+            return True
+        except Exception as e:
+            self.logger.error(f"❌ Error adding user to database: {e}")
+            return False
+    
+    async def get_user(self, user_id: int) -> Optional[Dict]:
+        """Get a user from the database"""
+        try:
+            user = await self.users.find_one({"user_id": user_id})
+            return user
+        except Exception as e:
+            self.logger.error(f"❌ Error getting user from database: {e}")
+            return None
+    
+    async def is_user_banned(self, user_id: int) -> bool:
+        """Check if a user is banned"""
+        try:
+            user = await self.get_user(user_id)
+            if user:
+                return user.get("banned", False)
+            return False
+        except Exception as e:
+            self.logger.error(f"❌ Error checking if user is banned: {e}")
+            return False
+    
+    # File-related methods
+    async def add_file(self, file_id: str, file_name: str, file_type: str, file_size: int, 
+                      mime_type: str = "", caption: str = "", chat_id: int = None) -> bool:
+        """Add a new file to the database"""
+        try:
+            file = {
+                "file_id": file_id,
+                "file_name": file_name,
+                "file_type": file_type,
+                "file_size": file_size,
+                "mime_type": mime_type,
+                "caption": caption,
+                "chat_id": chat_id,
+                "date_added": datetime.utcnow()
+            }
+            await self.files.update_one({"file_id": file_id}, {"$set": file}, upsert=True)
+            self.logger.info(f"✅ File {file_id} added/updated in database")
+            return True
+        except Exception as e:
+            self.logger.error(f"❌ Error adding file to database: {e}")
+            return False
+    
+    async def search_files(self, query: str, limit: int = 10) -> List[Dict]:
+        """Search for files in the database"""
+        try:
+            # Using text search if available, otherwise use regex
+            if await self.files.index_information().get("file_name_text"):
+                cursor = self.files.find(
+                    {"$text": {"$search": query}},
+                    {"score": {"$meta": "textScore"}}
+                ).sort([("score", {"$meta": "textScore"})])
+            else:
+                cursor = self.files.find({"file_name": {"$regex": query, "$options": "i"}})
+            
+            return await cursor.to_list(length=limit)
+        except Exception as e:
+            self.logger.error(f"❌ Error searching files: {e}")
+            return []
+    
+    # Chat-related methods
+    async def add_chat(self, chat_id: int, chat_type: str, title: str = "") -> bool:
+        """Add a chat to the database"""
+        try:
+            chat = {
+                "chat_id": chat_id,
+                "type": chat_type,
+                "title": title,
+                "date_added": datetime.utcnow()
+            }
+            await self.chats.update_one({"chat_id": chat_id}, {"$set": chat}, upsert=True)
+            self.logger.info(f"✅ Chat {chat_id} added/updated in database")
+            return True
+        except Exception as e:
+            self.logger.error(f"❌ Error adding chat to database: {e}")
+            return False
+    
+    # Stats methods
+    async def get_stats(self) -> Dict[str, int]:
+        """Get bot statistics"""
+        try:
+            total_users = await self.users.count_documents({})
+            total_files = await self.files.count_documents({})
+            total_chats = await self.chats.count_documents({})
+            
+            return {
+                "total_users": total_users,
+                "total_files": total_files,
+                "total_chats": total_chats
+            }
+        except Exception as e:
+            self.logger.error(f"❌ Error getting stats: {e}")
+            return {
+                "total_users": 0,
+                "total_files": 0,
+                "total_chats": 0
+            }
+
+# Initialize database
+db = Database(Config.MONGO_DB_URI)
