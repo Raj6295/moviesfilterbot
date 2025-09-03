@@ -97,12 +97,15 @@ async def main():
             
             # Set bot commands
             logger.info("⌨️ Setting up bot commands...")
-            await bot.set_bot_commands([
-                ("start", "Start the bot"),
-                ("help", "Show help message"),
-                ("search", "Search for files"),
-                ("stats", "Show bot statistics (Admin only)")
-            ])
+            from pyrogram.types import BotCommand
+            
+            commands = [
+                BotCommand("start", "Start the bot"),
+                BotCommand("help", "Show help message"),
+                BotCommand("search", "Search for files"),
+                BotCommand("stats", "Show bot statistics (Admin only)")
+            ]
+            await bot.set_bot_commands(commands)
             logger.info("✅ Bot commands set up successfully")
             
             # Keep the bot running
