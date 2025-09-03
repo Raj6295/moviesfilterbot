@@ -30,17 +30,52 @@ class Database:
             raise
         
     async def init_db(self):
-        """Initialize database indexes"""
+        """Initialize database indexes with proper error handling"""
         try:
-            # Create indexes for better query performance
-            await self.users.create_index("user_id", unique=True)
-            await self.files.create_index([("file_name", "text")])
-            await self.files.create_index("file_id", unique=True)
-            await self.chats.create_index("chat_id", unique=True)
-            self.logger.info("✅ Database indexes created successfully")
+            # Drop existing indexes to avoid conflicts
+            try:
+                await self.users.drop_index("user_id_1")
+            except Exception as e:
+                if "index not found" not in str(e).lower():
+                    self.logger.warning(f"⚠️ Error dropping user_id index: {e}")
+            
+            # Create indexes with explicit names and options
+            await self.users.create_index(
+                [("user_id", 1)],
+                name="user_id_unique",
+                unique=True
+            )
+            
+            # Create text index for file search
+            try:
+                await self.files.create_index(
+                    [("file_name", "text")],
+                    name="file_name_text"
+                )
+            except Exception as e:
+                if "text index already exists" not in str(e).lower():
+                    raise
+                
+            # Create unique index for file_id
+            await self.files.create_index(
+                [("file_id", 1)],
+                name="file_id_unique",
+                unique=True
+            )
+            
+            # Create unique index for chat_id
+            await self.chats.create_index(
+                [("chat_id", 1)],
+                name="chat_id_unique",
+                unique=True
+            )
+            
+            self.logger.info("✅ Database indexes verified/created successfully")
+            return True
+            
         except Exception as e:
-            self.logger.error(f"❌ Error creating database indexes: {e}")
-            raise
+            self.logger.error(f"❌ Error initializing database indexes: {e}", exc_info=True)
+            return False
     
     # User-related methods
     async def add_user(self, user_id: int, username: str = "", first_name: str = ""):
