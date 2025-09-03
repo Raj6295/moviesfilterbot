@@ -1,11 +1,16 @@
 import logging
+import sys
+import os
 from typing import Dict, List, Optional, Union
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pyrogram.errors import BadRequest, UserNotParticipant, FloodWait
 
-from ..config import Config
-from ..database.models import Database
+# Add the project root to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import Config
+from database.models import Database
 
 # Initialize logger
 logger = logging.getLogger(__name__)

@@ -1,11 +1,16 @@
 import time
+import sys
+import os
 from datetime import datetime, timedelta
 from pyrogram import filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-from ..client import bot
-from ...config import Config
-from ...database.models import db
+# Add the project root to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from handlers.client import bot
+from config import Config
+from database.models import db
 
 @bot.on_message(filters.command("stats") & (filters.private | filters.group))
 async def stats_command(client, message: Message):

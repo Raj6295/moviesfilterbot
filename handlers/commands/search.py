@@ -1,11 +1,16 @@
 import logging
+import sys
+import os
 from typing import List, Optional
 from pyrogram import filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-from ..client import bot
-from ...config import Config
-from ...database.models import db
+# Add the project root to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from handlers.client import bot
+from config import Config
+from database.models import db
 
 logger = logging.getLogger(__name__)
 

@@ -1,11 +1,16 @@
 import logging
+import sys
+import os
 from pyrogram import filters
 from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
-from ..client import bot
-from ...config import Config
-from .commands.help import help_command
-from .commands.about import about_callback
+# Add the project root to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from handlers.client import bot
+from config import Config
+from handlers.commands.help import help_command
+from handlers.commands.about import about_callback
 
 logger = logging.getLogger(__name__)
 
