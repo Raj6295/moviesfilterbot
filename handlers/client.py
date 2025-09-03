@@ -126,7 +126,28 @@ class MovieBot(Client):
 bot = MovieBot()
 
 # Register error handler
-@bot.on_errors()
-async def error_handler(_, update, error):
-    """Global error handler"""
-    await bot.handle_error(update, error)
+@bot.on_message(filters.all & ~filters.edited, group=-1)
+async def error_handler(client, message):
+    """Global error handler for messages"""
+    try:
+        # Let other handlers process the message
+        await message.continue_propagation()
+    except Exception as e:
+        logger.error(f"Error in message handler: {e}", exc_info=True)
+        try:
+            await message.reply_text("❌ An error occurred while processing your request.")
+        except Exception as send_error:
+            logger.error(f"Failed to send error message: {send_error}")
+
+@bot.on_callback_query(filters.all, group=-1)
+async def callback_error_handler(client, callback_query):
+    """Global error handler for callback queries"""
+    try:
+        # Let other handlers process the callback
+        await callback_query.continue_propagation()
+    except Exception as e:
+        logger.error(f"Error in callback handler: {e}", exc_info=True)
+        try:
+            await callback_query.answer("❌ An error occurred. Please try again.", show_alert=True)
+        except Exception as send_error:
+            logger.error(f"Failed to send error message: {send_error}")
