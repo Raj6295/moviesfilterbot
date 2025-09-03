@@ -74,11 +74,17 @@ async def start_bot():
             await bot.start()
             return await bot.get_me()
         except Exception as e:
-            if "FLOOD_WAIT" in str(e):
-                wait_time = int(str(e).split()[-2])
-                retry_count += 1
-                logger.warning(f"⚠️ Flood wait for {wait_time} seconds. Retry {retry_count}/{max_retries}")
-                await asyncio.sleep(wait_time)
+            error_str = str(e)
+            if "FLOOD_WAIT" in error_str:
+                try:
+                    # Extract wait time from error message
+                    wait_time = int(error_str.split("A wait of ")[1].split(" ")[0])
+                    retry_count += 1
+                    logger.warning(f"⚠️ Flood wait for {wait_time} seconds. Retry {retry_count}/{max_retries}")
+                    await asyncio.sleep(wait_time + 1)  # Add 1 second buffer
+                except (IndexError, ValueError) as parse_error:
+                    logger.error(f"❌ Error parsing flood wait time: {parse_error}")
+                    raise Exception("Failed to parse flood wait time") from e
             else:
                 raise
     
