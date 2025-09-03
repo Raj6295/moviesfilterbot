@@ -84,46 +84,59 @@ async def start_bot():
     
     raise Exception("Max retries exceeded for flood wait")
 
+async def initialize_database():
+    """Initialize the database with proper error handling"""
+    from database.models import db
+    try:
+        logger.info("🔄 Initializing database...")
+        success = await db.init_db()
+        if success:
+            logger.info("✅ Database initialized successfully")
+        else:
+            logger.warning("⚠️ Database initialization completed with warnings")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize database: {e}")
+        raise
+
 async def main():
     """Main function to start the bot and web server"""
     try:
         logger.info("🚀 Starting bot initialization...")
         
-        # Start web server
-        logger.info("🌐 Starting web server...")
-        web_runner, web_site = await start_web_server()
-        logger.info("✅ Web server started successfully")
+        # Initialize database first
+        await initialize_database()
         
-        # Start the bot with retry logic
-        logger.info("🤖 Starting bot client...")
+        # Start the web server in the background
+        web_task = asyncio.create_task(start_web_server())
+        
+        # Start the bot
+        me = await start_bot()
+        logger.info(f"✅ Bot started as @{me.username} (ID: {me.id})")
+        
+        # Set bot commands
+        logger.info("⌨️ Setting up bot commands...")
+        from pyrogram.types import BotCommand
+        
+        commands = [
+            BotCommand("start", "Start the bot"),
+            BotCommand("help", "Show help message"),
+            BotCommand("search", "Search for files"),
+            BotCommand("stats", "Show bot statistics (Admin only)")
+        ]
+        
         try:
-            me = await start_bot()
-            logger.info(f"✅ Bot started as @{me.username} (ID: {me.id})")
-            
-            # Initialize database
-            from database.models import db
-            await db.init_db()
-            
-            # Set bot commands
-            logger.info("⌨️ Setting up bot commands...")
-            from pyrogram.types import BotCommand
-            
-            commands = [
-                BotCommand("start", "Start the bot"),
-                BotCommand("help", "Show help message"),
-                BotCommand("search", "Search for files"),
-                BotCommand("stats", "Show bot statistics (Admin only)")
-            ]
             await bot.set_bot_commands(commands)
             logger.info("✅ Bot commands set up successfully")
-            
-            # Keep the bot running
-            logger.info("Bot and web server are now running.")
-            await idle()
-            
         except Exception as e:
-            logger.error(f"❌ Error in bot initialization: {e}", exc_info=True)
-            raise
+            logger.error(f"❌ Failed to set bot commands: {e}")
+        
+        # Keep the bot running
+        logger.info("🤖 Bot and web server are now running.")
+        await idle()
+            
+    except Exception as e:
+        logger.error(f"❌ Error in bot initialization: {e}", exc_info=True)
+        raise
             
     except ApiIdInvalid:
         logger.error("❌ Invalid API ID or API HASH. Please check your credentials.")

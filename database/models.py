@@ -31,61 +31,62 @@ class Database:
         
     async def init_db(self):
         """Initialize database indexes with proper error handling"""
-        async def _create_indexes():
-            try:
-                # Create indexes with explicit names and options
-                await self.users.create_index(
-                    [("user_id", 1)],
-                    name="user_id_unique",
-                    unique=True
-                )
-                
-                # Create text index for file search
-                await self.files.create_index(
-                    [("file_name", "text")],
-                    name="file_name_text"
-                )
-                
-                # Create unique index for file_id
-                await self.files.create_index(
-                    [("file_id", 1)],
-                    name="file_id_unique",
-                    unique=True
-                )
-                
-                # Create unique index for chat_id
-                await self.chats.create_index(
-                    [("chat_id", 1)],
-                    name="chat_id_unique",
-                    unique=True
-                )
-                
-                self.logger.info("✅ Database indexes verified/created successfully")
-                return True
-                
-            except Exception as e:
-                if "already exists" in str(e).lower():
-                    self.logger.info("ℹ️ Database indexes already exist")
-                    return True
-                self.logger.error(f"❌ Error creating database indexes: {e}", exc_info=True)
-                return False
-        
         try:
-            # Try to create indexes directly first
+            # Get the current event loop
+            loop = asyncio.get_running_loop()
+            
+            # Create a new task to run the index creation
+            async def _create_indexes():
+                try:
+                    # Create all indexes in a single transaction if supported
+                    async with await self._client.start_session() as session:
+                        async with session.start_transaction():
+                            # Create user index
+                            await self.users.create_index(
+                                [("user_id", 1)],
+                                name="user_id_unique",
+                                unique=True,
+                                session=session
+                            )
+                            
+                            # Create file indexes
+                            await self.files.create_index(
+                                [("file_name", "text")],
+                                name="file_name_text",
+                                session=session
+                            )
+                            
+                            await self.files.create_index(
+                                [("file_id", 1)],
+                                name="file_id_unique",
+                                unique=True,
+                                session=session
+                            )
+                            
+                            # Create chat index
+                            await self.chats.create_index(
+                                [("chat_id", 1)],
+                                name="chat_id_unique",
+                                unique=True,
+                                session=session
+                            )
+                            
+                    self.logger.info("✅ Database indexes verified/created successfully")
+                    return True
+                    
+                except Exception as e:
+                    if "already exists" in str(e).lower() or "E11000" in str(e):
+                        self.logger.info("ℹ️ Database indexes already exist")
+                        return True
+                    self.logger.error(f"❌ Error creating database indexes: {e}", exc_info=True)
+                    return False
+            
+            # Run the index creation in the current event loop
             return await _create_indexes()
             
-        except RuntimeError as e:
-            if "attached to a different loop" in str(e):
-                # If we get a loop error, run in a new event loop
-                import asyncio
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    result = loop.run_until_complete(_create_indexes())
-                    return result
-                finally:
-                    loop.close()
-            raise
+        except Exception as e:
+            self.logger.error(f"❌ Critical error in database initialization: {e}", exc_info=True)
+            return False
     
     # User-related methods
     async def add_user(self, user_id: int, username: str = "", first_name: str = ""):
